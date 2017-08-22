@@ -30,6 +30,13 @@ func (it sampleStreamIterator) Metric() metric.Metric {
 	return metric.Metric{Metric: it.ss.Metric}
 }
 
+func (it sampleStreamIterator) FirstTime() model.Time {
+	if len(it.ss.Values) == 0 {
+		return model.Latest
+	}
+	return it.ss.Values[0].Timestamp
+}
+
 func (it sampleStreamIterator) ValueAtOrBeforeTime(ts model.Time) model.SamplePair {
 	// TODO: This is a naive inefficient approach - in reality, queries go mostly
 	// linearly through iterators, and we will want to make successive calls to

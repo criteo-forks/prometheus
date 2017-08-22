@@ -397,6 +397,7 @@ func (s *memorySeries) newIterator(
 		metric:           s.metric,
 		pinnedChunkDescs: pinnedChunkDescs,
 		evictRequests:    evictRequests,
+		savedFirstTime:   s.firstTime(),
 	}
 }
 
@@ -418,8 +419,9 @@ func (s *memorySeries) preloadChunksForInstant(
 		lastSample != model.ZeroSamplePair {
 		iter := &boundedIterator{
 			it: &singleSampleSeriesIterator{
-				samplePair: lastSample,
-				metric:     s.metric,
+				samplePair:     lastSample,
+				metric:         s.metric,
+				savedFirstTime: s.firstTime(),
 			},
 			start: model.Now().Add(-mss.dropAfter),
 		}
@@ -567,6 +569,8 @@ type memorySeriesIterator struct {
 	quarantine func(error)
 	// The metric corresponding to the iterator.
 	metric model.Metric
+	// The first timestamp for the metric corresponding to the iterator.
+	savedFirstTime model.Time
 	// Chunks that were pinned for this iterator.
 	pinnedChunkDescs []*chunk.Desc
 	// Where to send evict requests when unpinning pinned chunks.
@@ -654,6 +658,11 @@ func (it *memorySeriesIterator) Metric() metric.Metric {
 	return metric.Metric{Metric: it.metric}
 }
 
+// FirstTime implements SeriesIterator.
+func (it *memorySeriesIterator) FirstTime() model.Time {
+	return it.savedFirstTime
+}
+
 // chunkIterator returns the chunk.Iterator for the chunk at position i (and
 // creates it if needed).
 func (it *memorySeriesIterator) chunkIterator(i int) chunk.Iterator {
@@ -676,8 +685,9 @@ func (it *memorySeriesIterator) Close() {
 // iterator" that returns a single sample only. The sample is saved in the
 // iterator itself, so no chunks need to be pinned.
 type singleSampleSeriesIterator struct {
-	samplePair model.SamplePair
-	metric     model.Metric
+	samplePair     model.SamplePair
+	metric         model.Metric
+	savedFirstTime model.Time
 }
 
 // ValueAtTime implements SeriesIterator.
@@ -701,6 +711,11 @@ func (it *singleSampleSeriesIterator) Metric() metric.Metric {
 	return metric.Metric{Metric: it.metric}
 }
 
+// FirstTime implements SeriesIterator.
+func (it *singleSampleSeriesIterator) FirstTime() model.Time {
+	return it.savedFirstTime
+}
+
 // Close implements SeriesIterator.
 func (it *singleSampleSeriesIterator) Close() {}
 
@@ -720,6 +735,11 @@ func (i nopSeriesIterator) RangeValues(in metric.Interval) []model.SamplePair {
 // Metric implements SeriesIterator.
 func (i nopSeriesIterator) Metric() metric.Metric {
 	return metric.Metric{}
+}
+
+// FirstTime implements SeriesIterator.
+func (i nopSeriesIterator) FirstTime() model.Time {
+	return model.Latest
 }
 
 // Close implements SeriesIterator.

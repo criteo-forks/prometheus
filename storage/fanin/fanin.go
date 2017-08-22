@@ -66,24 +66,34 @@ type querier struct {
 }
 
 func (q querier) QueryRange(ctx context.Context, from, through model.Time, matchers ...*metric.LabelMatcher) ([]local.SeriesIterator, error) {
-	return q.query(ctx, func(q local.Querier) ([]local.SeriesIterator, error) {
+	return q.query(ctx, from, func(q local.Querier) ([]local.SeriesIterator, error) {
 		return q.QueryRange(ctx, from, through, matchers...)
 	})
 }
 
 func (q querier) QueryInstant(ctx context.Context, ts model.Time, stalenessDelta time.Duration, matchers ...*metric.LabelMatcher) ([]local.SeriesIterator, error) {
-	return q.query(ctx, func(q local.Querier) ([]local.SeriesIterator, error) {
+	return q.query(ctx, ts.Add(-stalenessDelta), func(q local.Querier) ([]local.SeriesIterator, error) {
 		return q.QueryInstant(ctx, ts, stalenessDelta, matchers...)
 	})
 }
 
-func (q querier) query(ctx context.Context, qFn func(q local.Querier) ([]local.SeriesIterator, error)) ([]local.SeriesIterator, error) {
+func (q querier) query(ctx context.Context, from model.Time, qFn func(q local.Querier) ([]local.SeriesIterator, error)) ([]local.SeriesIterator, error) {
 	localIts, err := qFn(q.local)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(q.remotes) == 0 || localOnly(ctx) {
+		return localIts, nil
+	}
+
+	latestFirstTime := model.Earliest
+	for _, it := range localIts {
+		if it.FirstTime().After(latestFirstTime) {
+			latestFirstTime = it.FirstTime()
+		}
+	}
+	if len(localIts) != 0 && latestFirstTime.Before(from) {
 		return localIts, nil
 	}
 
@@ -197,6 +207,21 @@ func (mit mergeIterator) Metric() metric.Metric {
 	// If there is no local iterator, there has to be at least one remote one in
 	// order for this iterator to have been created.
 	return mit.remote[0].Metric()
+}
+
+func (mit mergeIterator) FirstTime() model.Time {
+	firstTime := model.Latest
+	if mit.local != nil {
+		if mit.local.FirstTime().Before(firstTime) {
+			firstTime = mit.local.FirstTime()
+		}
+	}
+	for _, it := range mit.remote {
+		if it.FirstTime().Before(firstTime) {
+			firstTime = it.FirstTime()
+		}
+	}
+	return firstTime
 }
 
 func (mit mergeIterator) Close() {

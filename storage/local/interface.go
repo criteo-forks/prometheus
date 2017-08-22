@@ -101,6 +101,8 @@ type SeriesIterator interface {
 	RangeValues(metric.Interval) []model.SamplePair
 	// Returns the metric of the series that the iterator corresponds to.
 	Metric() metric.Metric
+	// Returns the timestamp of the first sample in the series.
+	FirstTime() model.Time
 	// Closes the iterator and releases the underlying data.
 	Close()
 }

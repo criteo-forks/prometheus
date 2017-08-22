@@ -568,6 +568,11 @@ func (bit *boundedIterator) Metric() metric.Metric {
 	return bit.it.Metric()
 }
 
+// FirstTime implements SeriesIterator.
+func (bit *boundedIterator) FirstTime() model.Time {
+	return bit.it.FirstTime()
+}
+
 // Close implements SeriesIterator.
 func (bit *boundedIterator) Close() {
 	bit.it.Close()
