@@ -1,12 +1,37 @@
-sudo: false
+sudo: required
+
+services:
+- docker
 
 language: go
 
 go:
-- 1.9.x
 - 1.x
 
 go_import_path: github.com/prometheus/prometheus
 
+install:
+#- git clone https://github.com/$TRAVIS_REPO_SLUG.git prometheus/prometheus
+
 script:
-- make check_license style test
+- VERSION=$(echo $TRAVIS_TAG | sed 's/^release-//' | sed 's/^v//')
+- if [ -n "$TRAVIS_TAG" ]; then echo "$VERSION" > VERSION; fi
+- make check_license style test staticcheck
+- make
+
+before_deploy:
+- make promu
+- promu crossbuild
+- promu crossbuild tarballs
+- promu checksum .tarballs
+
+deploy:
+  provider: releases
+  api_key:
+    secure: yCCsEN4GrEUrB+IYIsS1fIeXW5oyA4d66VOWu9yH2NXnE/k35ei3JVS8pv0AgQp1VLl6fCQFFXypvohVXDD/D6SDmEwR47gjEzNnK9ubJSke0PI/s2TW3ZAkq4A7Dpt3KlNYzcMTeFg5p+c1MK1vxyti+9eSLAj9S/ZlEgeojlrziw6uauPcDqjFun5OXdIxWexs5VNhsJkeezLwE1V6PYBPDQ7EUb7TorxUO0vnE3uHTcn4fnqQCABa4+Xh2EeYLJgHUULkOBiDsqhQkapvWE1ycFLg0emgH5dcaLXfeqkcKvlg5lY6Rdu5Bvuwmx069fAvBUqzK8sPZwL1uVma6KXr2rsmihLXv+H/KqNQwvTnex0yC2TegYXczVzT4PSqRB70SjTgvTJnBom4Iv4tuw0PMwv/HzNt6eiuVfx56YpoRE/ZpbL9HGH8M6eKU9Zb1qeb7cI4+upuBvFvauKBXg2gss0bGXfbphvO/LSsBFjHZHtriWWco9S9RRjrY2WXfoy1qlvH/zw4urgrJijgZ4rwpvssUw2dVGXvMRQ/O+MHRXa3+KtkQMbIfAP+yTw9mX5pZffjVq5aA/pXnc7Uwp9Ks+3yHgk6KlAqTskaCTbn93fZqupcZZiIP6PTpqL5ywvuKZ96ak5UKqx9UTOZ76m/KQghs/OmJUlg2CCLaf0=
+  file_glob: true
+  file: .tarballs/*
+  skip_cleanup: true
+  on:
+    tags: true
+    repo: criteo-forks/prometheus
