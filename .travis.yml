@@ -1,3 +1,8 @@
+sudo: required
+
+services:
+- docker
+
 language: go
 
 # Whenever the Go version is updated here, .circleci/config.yml and .promu.yml
@@ -13,6 +18,28 @@ go_import_path: github.com/prometheus/prometheus
 before_install:
 - travis_retry make deps
 
+install:
+#- git clone https://github.com/$TRAVIS_REPO_SLUG.git prometheus/prometheus
+
 script:
-- make check_license style unused test lint check_assets
-- git diff --exit-code
+- VERSION=$(echo $TRAVIS_TAG | sed 's/^release-//' | sed 's/^v//')
+- if [ -n "$TRAVIS_TAG" ]; then echo "$VERSION" > VERSION; fi
+- make check_license style test staticcheck
+- make
+
+before_deploy:
+- make promu
+- promu crossbuild
+- promu crossbuild tarballs
+- promu checksum .tarballs
+
+deploy:
+  provider: releases
+  api_key:
+    secure: KCNZSIde1tiC6+QJ7vBttDvJjwfN0BudTKXThdkGWP+ZZzxnXJvyhksl6Hu+3J1E1AqFhCUOHMVTIONGPy6P9fx5xvyPAtC8ut5L4qQG0bIzOzHLf9uElkkV3NI/+BaWf+8hHUeCaChCtV6WctpcYekp7IMb44qGDXtzY3rfmfgd91fTRoVRaeTk423ruoWim18kvF/J63XaJ1Ja2Y/kYzXafpS0/vDzEz/AOaKqBQVqQGcJULn20d0U3txF/Vscxlx804mBJVHvpXxr9TLmM9OKUN35WUazVO17/WLkImiLSBeVFIqLcFIkzg0h4IGw2XgRyg1N3IyglG9GSXa16AF+QWQbrDl6mQRUdUUn7FgCIYQxWNUR/0KFKD1Dx9+o1v2wIc/1/LKtNqpp9j//lC9ztMGURJYlpYQyU0qgpe39TQMQCGbKwEo8Z1yDCWXTaYD2zOa5ChiVHSa60GUYpkRqaFKqUCreKmJtOAPXMcviLmIhDomoMvAeDyR+Ne+1M6Bi5I5scE0WWBzAOUT38s26AxOpLizBA84N8Ih8z889hkHqxIaklXHaxpZVcN5TvWhOOxa8J+o5ZLETolEQyyJYKx5b4bU/loUwaXB/L7RdtLzwugoUMksxmR+hVIoiKk9FNHKps7HMQ/nx+m0Occ/7yZQPzVuyMvxzaGjjuYo=
+  file_glob: true
+  file: .tarballs/*
+  skip_cleanup: true
+  on:
+    tags: true
+    repo: criteo-forks/prometheus
