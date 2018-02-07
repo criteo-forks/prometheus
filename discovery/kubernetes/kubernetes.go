@@ -159,8 +159,8 @@ const resyncPeriod = 10 * time.Minute
 
 // Run implements the TargetProvider interface.
 func (d *Discovery) Run(ctx context.Context, ch chan<- []*config.TargetGroup) {
-	rclient := d.client.Core().RESTClient()
-	reclient := d.client.Extensions().RESTClient()
+	rclient := d.client.CoreV1().RESTClient()
+	reclient := d.client.ExtensionsV1beta1().RESTClient()
 
 	namespaces := d.getNamespaces()
 
